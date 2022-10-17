@@ -1,0 +1,27 @@
+{
+  "name": "fxindex-v2",
+  "version": "1.0.0",
+  "description": "indexes fxhash transactions on testnet",
+  "author": "louis holley <louisholley@me.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "node ./dist/app.js",
+    "dev": "nodemon -L -e ts --exec \"yarn build && yarn start\"",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@tzkt/sdk-api": "^1.0.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "nodemon": "^2.0.20",
+    "pg": "^8.8.0",
+    "reflect-metadata": "^0.1.13",
+    "typeorm": "^0.3.10",
+    "typescript": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.14",
+    "@types/pg": "^8.6.5",
+    "@types/node": "^14.14.22"
+  }
+}
