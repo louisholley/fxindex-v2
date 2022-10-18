@@ -1,47 +1,81 @@
-import { defaults, operationsGetTransactions } from "@tzkt/sdk-api";
-import { BATCH_LIMIT, CONTRACTS, ENTRYPOINTS } from "./constants";
+import {
+  blocksGet,
+  defaults,
+  Int32Parameter,
+  operationsGetTransactions,
+} from "@tzkt/sdk-api";
+import { BATCH_LIMIT, CONTRACTS } from "./constants";
 import { AppDataSource } from "./data-source";
 import { mapTransactionsToEntities } from "./lib";
 
 defaults.baseUrl = "https://api.ghostnet.tzkt.io/";
 
-// fix this because we're getting the earliest entry in the batch rn - we want the latest!
-// we need to ignore project transactions with entrypoint mint also
-const dedupeById = (entities: any[]) =>
-  Object.values(
-    entities.reduce((acc, entity) => {
-      if (acc[entity.id]) {
-        return acc;
-      }
-      acc[entity.id] = entity;
-      return acc;
-    }, {})
-  );
+const getFilters = (level: Int32Parameter, cr?: number) => ({
+  level,
+  target: {
+    in: CONTRACTS.map((c) => c.address),
+  },
+  entrypoint: {
+    in: CONTRACTS.map((c) => c.entrypoint),
+  },
+  offset: cr ? { cr } : undefined,
+  limit: BATCH_LIMIT,
+});
+
+// const indexEveryBlock = async (
+//   level: number,
+//   stopAtLevel: number,
+//   cr?: number
+// ) => {
+//   console.log(`indexing from block ${level}`, cr ? `with cursor ${cr}` : "");
+
+//   const transactions = await operationsGetTransactions(
+//     getFilters({ eq: level }, cr)
+//   );
+
+//   await AppDataSource.manager.transaction(
+//     "SERIALIZABLE",
+//     async (transactionManager) => {
+//       const { users, projects, gentks } =
+//         mapTransactionsToEntities(transactions);
+
+//       await transactionManager.save(users);
+//       await transactionManager.save(projects);
+//       await transactionManager.save(gentks);
+//     }
+//   );
+
+//   console.log(transactions.length, "transactions indexed");
+
+//   if (level === stopAtLevel) return;
+//   if (transactions.length === BATCH_LIMIT)
+//     return indexEveryBlock(
+//       level,
+//       stopAtLevel,
+//       transactions[transactions.length - 1].id
+//     );
+//   if (transactions.length < BATCH_LIMIT)
+//     return indexEveryBlock(level + 1, stopAtLevel);
+// };
 
 const runIndexer = async (level: number, cr?: number) => {
   console.log(`indexing from block ${level}`, cr ? `with cursor ${cr}` : "");
 
-  const transactions = await operationsGetTransactions({
-    level: {
-      gt: level,
-    },
-    target: {
-      in: CONTRACTS,
-    },
-    entrypoint: {
-      in: ENTRYPOINTS,
-    },
-    offset: cr ? { cr } : undefined,
-    limit: 100,
-  });
+  const transactions = await operationsGetTransactions(
+    getFilters({ gt: level }, cr)
+  );
 
   if (transactions.length === 0) return null;
 
   await AppDataSource.manager.transaction(
     "SERIALIZABLE",
     async (transactionManager) => {
-      const entities = dedupeById(mapTransactionsToEntities(transactions));
-      await transactionManager.save(entities);
+      const { users, projects, gentks } =
+        mapTransactionsToEntities(transactions);
+
+      await transactionManager.save(users);
+      await transactionManager.save(projects);
+      await transactionManager.save(gentks);
     }
   );
 
@@ -56,10 +90,10 @@ const runIndexer = async (level: number, cr?: number) => {
 const loadInitialBlock = async () => {
   const transactions = await operationsGetTransactions({
     target: {
-      in: CONTRACTS,
+      in: CONTRACTS.map((c) => c.address),
     },
     entrypoint: {
-      in: ENTRYPOINTS,
+      in: CONTRACTS.map((c) => c.entrypoint),
     },
     limit: 1,
   });
@@ -82,5 +116,12 @@ AppDataSource.initialize()
     const initialBlock = await loadInitialBlock();
     blockCursor = await runIndexer(initialBlock);
     setInterval(liveIndex, 30000);
+
+    // blockCursor = await blocksGet({
+    //   limit: 1,
+    //   sort: { desc: "id" },
+    // });
+    // await indexEveryBlock(0, blockCursor);
+    // setInterval(liveIndex, 30000);
   })
   .catch((error) => console.log(error));
