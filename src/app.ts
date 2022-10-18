@@ -2,6 +2,7 @@ import {
   blocksGet,
   defaults,
   Int32Parameter,
+  operationsGetOriginations,
   operationsGetTransactions,
 } from "@tzkt/sdk-api";
 import { BATCH_LIMIT, CONTRACTS } from "./constants";
@@ -88,19 +89,16 @@ const runIndexer = async (level: number, cr?: number) => {
 };
 
 const loadInitialBlock = async () => {
-  const transactions = await operationsGetTransactions({
-    target: {
+  const originations = await operationsGetOriginations({
+    originatedContract: {
       in: CONTRACTS.map((c) => c.address),
-    },
-    entrypoint: {
-      in: CONTRACTS.map((c) => c.entrypoint),
     },
     limit: 1,
   });
   /**
    * subtract 1 as we query for transactions gt: level
    */
-  return transactions[0].level - 1;
+  return originations[0].level - 1;
 };
 
 let blockCursor = 0;
