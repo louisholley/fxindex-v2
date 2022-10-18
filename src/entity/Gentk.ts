@@ -15,6 +15,9 @@ export class Gentk {
   @JoinColumn()
   minter: User;
 
+  @Column({ type: "timestamp" })
+  timestamp: Date;
+
   @Column("simple-json")
   metadata: any;
 
